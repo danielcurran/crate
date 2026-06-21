@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-album-renamer — Standardize music album folder names to 'Artist - Album' format.
+crate — Standardize music album folder names to 'Artist - Album' format.
+Like pulling records from a crate and putting them on the shelf.
 Parses folder names, scans audio file metadata, and interactively renames.
 """
 
@@ -35,7 +36,7 @@ SKIP_FOLDER_PATTERNS = [
     ]
 ]
 
-ROLLBACK_FILE = Path.home() / ".album_renamer_rollback.json"
+ROLLBACK_FILE = Path.home() / ".crate_rollback.json"
 
 FORBIDDEN_CHARS = re.compile(r'[<>:"/\\|?*]')
 
@@ -446,7 +447,7 @@ def main() -> None:
     print()
     rollback = execute_renames(renames)
     print(f"\nDone. {len(rollback)} folder(s) renamed.")
-    print(f"Undo with: album_renamer --undo")
+    print(f"Undo with: python crate.py --undo")
 
 
 if __name__ == "__main__":
