@@ -40,7 +40,7 @@ python crate.py --undo
 | `[flac] Sid Frank -- Beijing 1988 [Zoomin' Night, 2024]` | `Sid Frank - Beijing 1988` |
 | `billy woods - 2015 - today, i wrote nothing` | `billy woods - today, i wrote nothing` |
 | `Billy Woods - Known Unknowns (2017) [FLAC]` | `Billy Woods - Known Unknowns` |
-| `(2023) Soon` | `Artist From Metadata - Soon` |
+| `(2023) Soon` | `Hana Stretton - Soon` |
 | `1975 Coney Island Baby` | prompted or metadata-sourced |
 
 - Skips folders already in `Artist - Album` format
