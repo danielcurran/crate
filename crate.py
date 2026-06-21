@@ -288,6 +288,27 @@ def execute_renames(renames: list[tuple[Path, Path]]) -> list[dict]:
     return rollback
 
 
+def remove_empty_containers(container_dirs: set[Path], rollback: list[dict], target: Path) -> None:
+    """Remove container folders that are now empty after extracting their albums."""
+    candidates = set(container_dirs)
+    if target.is_dir():
+        for f in target.iterdir():
+            if f.is_dir() and not any(f.iterdir()) and not should_skip_folder(f):
+                candidates.add(f)
+    for folder in sorted(candidates, reverse=True):
+        if folder.exists() and not any(folder.iterdir()):
+            try:
+                folder.rmdir()
+                rollback.append({
+                    "action": "remove_container",
+                    "path": str(folder),
+                    "timestamp": datetime.now().isoformat(),
+                })
+                print(f"  REMOVED (empty): {folder.name}/")
+            except OSError as e:
+                print(f"  FAIL to remove: {folder.name}/  ({e})")
+
+
 def undo_last_run() -> int:
     if not ROLLBACK_FILE.exists():
         print("No rollback file found.")
@@ -296,6 +317,16 @@ def undo_last_run() -> int:
         records = json.load(f)
     restored = 0
     for rec in reversed(records):
+        if rec.get("action") == "remove_container":
+            path = Path(rec["path"])
+            if not path.exists():
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                    print(f"  RESTORED: {path.name}/")
+                    restored += 1
+                except OSError as e:
+                    print(f"  RESTORE FAIL: {path.name}/  ({e})")
+            continue
         original = Path(rec["original"])
         new_path = Path(rec["new"])
         if new_path.exists():
@@ -381,6 +412,8 @@ def main() -> None:
     parsed: list[dict] = []
     need_metadata: list[Path] = []
 
+    container_dirs: set[Path] = set()
+
     for folder in folders:
         name = folder.name
 
@@ -401,6 +434,7 @@ def main() -> None:
                     "reason": "container_child",
                 })
                 print(f"    {child.name} → {artist_name} - {album}")
+            container_dirs.add(folder)
             continue
 
         if is_already_correct_format(name):
@@ -509,7 +543,11 @@ def main() -> None:
 
     print()
     rollback = execute_renames(renames)
-    print(f"\nDone. {len(rollback)} folder(s) renamed.")
+    if container_dirs:
+        remove_empty_containers(container_dirs, rollback, target)
+        with open(ROLLBACK_FILE, "w") as f:
+            json.dump(rollback, f, indent=2)
+    print(f"\nDone. {len(rollback)} folder(s) renamed/removed.")
     print(f"Undo with: python crate.py --undo")
 
 

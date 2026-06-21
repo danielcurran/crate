@@ -55,7 +55,7 @@ python3 -m venv venv && source venv/bin/activate && pip install mutagen
 - Removes years from album names
 - Preserves original casing (billy woods stays billy woods)
 - Creates a rollback file for undo
-- **Flattens artist containers** — auto-detects folders that contain album subdirectories (e.g., `Brian Eno/` containing `1973 Here Come The Warm Jets`) and renames+promotes the children to `Artist - Album` at the container's parent level
+- **Flattens artist containers** — auto-detects folders that contain album subdirectories (e.g., `Brian Eno/` containing `1973 Here Come The Warm Jets`) and renames+promotes the children to `Artist - Album` at the container's parent level, then removes the now-empty container folder
 
 ## Edge cases needing your intervention
 
