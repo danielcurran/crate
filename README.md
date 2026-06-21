@@ -41,7 +41,7 @@ python crate.py --undo
 | `billy woods - 2015 - today, i wrote nothing` | `billy woods - today, i wrote nothing` |
 | `Billy Woods - Known Unknowns (2017) [FLAC]` | `Billy Woods - Known Unknowns` |
 | `(2023) Soon` | `Hana Stretton - Soon` |
-| `1975 Coney Island Baby` | prompted or metadata-sourced |
+| `1975 Coney Island Baby` | `Lou Reed - Coney Island Baby` |
 
 - Skips folders already in `Artist - Album` format
 - Skips `Disc 1`, `Volume 2`, `CD 3`, covers/scans folders
