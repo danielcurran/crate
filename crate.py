@@ -20,6 +20,12 @@ AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".ogg", ".wav", ".wma", ".aiff", ".
 
 SKIP_EXTENSIONS = {".zip", ".rar", ".7z", ".flac", ".mp3", ".m4a", ".wav", ".ogg", ".mkv", ".avi", ".mp4", ".mov", ".webm", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".pdf", ".nfo", ".sfv", ".m3u", ".cue", ".log", ".txt", ".url", ".md5", ".st5", ".accurip"}
 
+# Folders whose names look like common non-artist, non-album catch-all entries
+NON_ALBUM_NAMES = re.compile(
+    r"^(?:new\s*(?:music|additions|downloads?)?|incoming|misc|unsorted|other|stuff|random|temp|tmp|backup|archive)$",
+    re.IGNORECASE,
+)
+
 SKIP_FOLDER_PATTERNS = [
     re.compile(p, re.IGNORECASE)
     for p in [
@@ -155,6 +161,30 @@ def clean_album_name(raw: str) -> str:
     return raw
 
 
+def strip_leading_year(name: str) -> str:
+    """Strip a leading year prefix from an album name."""
+    result = re.sub(r"^(?:19|20)\d{2}\s*-?\s*", "", name).strip()
+    return result if result else name
+
+
+def is_artist_container(folder: Path) -> bool:
+    """Check if a folder is an artist container (has album subdirs, isn't an album itself)."""
+    if not folder.is_dir():
+        return False
+    name = folder.name.strip()
+    if is_already_correct_format(name):
+        return False
+    artist, _ = parse_folder_name(name)
+    if artist:
+        return False
+    if NON_ALBUM_NAMES.match(name):
+        return False
+    for f in folder.iterdir():
+        if f.is_dir() and not should_skip_folder(f):
+            return True
+    return False
+
+
 def safe_filename(name: str) -> str:
     return FORBIDDEN_CHARS.sub("", name)
 
@@ -235,13 +265,11 @@ def bulk_scan_artists(base_dir: Path, folders: list[Path]) -> dict[Path, str | N
 # ── rename engine ──────────────────────────────────────────────────────────────
 
 
-def execute_renames(renames: list[tuple[Path, str]]) -> list[dict]:
+def execute_renames(renames: list[tuple[Path, Path]]) -> list[dict]:
     rollback: list[dict] = []
-    for folder, new_name in renames:
-        parent = folder.parent
-        new_path = parent / new_name
+    for folder, new_path in renames:
         if new_path.exists():
-            print(f"  SKIP (exists): {folder.name} → {new_name}")
+            print(f"  SKIP (exists): {folder.name} → {new_path.name}")
             continue
         try:
             folder.rename(new_path)
@@ -252,9 +280,9 @@ def execute_renames(renames: list[tuple[Path, str]]) -> list[dict]:
                     "timestamp": datetime.now().isoformat(),
                 }
             )
-            print(f"  OK: {folder.name} → {new_name}")
+            print(f"  OK: {folder.name} → {new_path.name}")
         except OSError as e:
-            print(f"  FAIL: {folder.name} → {new_name}  ({e})")
+            print(f"  FAIL: {folder.name} → {new_path.name}  ({e})")
     with open(ROLLBACK_FILE, "w") as f:
         json.dump(rollback, f, indent=2)
     return rollback
@@ -322,6 +350,11 @@ def main() -> None:
         action="store_true",
         help="Skip scanning audio file metadata for missing artists.",
     )
+    parser.add_argument(
+        "--no-flatten",
+        action="store_true",
+        help="Disable automatic detection of artist container folders.",
+    )
 
     args = parser.parse_args()
 
@@ -344,12 +377,32 @@ def main() -> None:
 
     print(f"Found {len(folders)} subfolder(s) to analyze.\n")
 
-    # ── phase 1: parse every folder name ──
+    # ── phase 1: parse every folder name (with container flattening) ──
     parsed: list[dict] = []
     need_metadata: list[Path] = []
 
     for folder in folders:
         name = folder.name
+
+        # Detect artist containers (folder containing album subdirs)
+        if not args.no_flatten and is_artist_container(folder):
+            print(f"  CONTAINER: {folder.name}/")
+            artist_name = name.strip()
+            children = sorted(
+                f for f in folder.iterdir()
+                if f.is_dir() and not should_skip_folder(f)
+            )
+            for child in children:
+                album = strip_leading_year(clean_album_name(child.name))
+                parsed.append({
+                    "folder": child,
+                    "artist": artist_name,
+                    "album": album,
+                    "reason": "container_child",
+                })
+                print(f"    {child.name} → {artist_name} - {album}")
+            continue
+
         if is_already_correct_format(name):
             print(f"  SKIP (already correct): {name}")
             parsed.append({"folder": folder, "artist": None, "album": name, "reason": "already_correct"})
@@ -382,21 +435,27 @@ def main() -> None:
                     print(f"  no metadata found: {entry['folder'].name}")
 
     # ── phase 3: build rename list + unresolved ──
-    renames: list[tuple[Path, str]] = []
+    renames: list[tuple[Path, Path]] = []
     unresolved: list[dict] = []
 
     for entry in parsed:
-        if entry["reason"] == "already_correct":
+        if entry["reason"] in ("already_correct",):
             continue
+
+        folder = entry["folder"]
         artist = entry.get("artist")
         album = entry.get("album", "")
 
         if artist:
             new_name = safe_filename(f"{artist} - {album}")
-            if new_name == entry["folder"].name:
+            if entry.get("reason") == "container_child":
+                new_path = folder.parent.parent / new_name
+            else:
+                new_path = folder.parent / new_name
+            if new_path == folder:
                 print(f"  already matches: {new_name}")
                 continue
-            renames.append((entry["folder"], new_name))
+            renames.append((folder, new_path))
         else:
             unresolved.append(entry)
 
@@ -422,7 +481,8 @@ def main() -> None:
                     continue
                 if choice:
                     new_name = safe_filename(f"{choice} - {album}")
-                    renames.append((folder, new_name))
+                    new_path = folder.parent / new_name
+                    renames.append((folder, new_path))
 
     # ── phase 5: preview + execute ──
     if not renames:
@@ -430,9 +490,12 @@ def main() -> None:
         return
 
     print(f"\n─── Proposed renames ({len(renames)}) ───\n")
-    for folder, new_name in renames:
+    for folder, new_path in renames:
         print(f"  {folder.name}")
-        print(f"  → {new_name}\n")
+        print(f"  → {new_path.name}")
+        if folder.parent != new_path.parent:
+            print(f"     (moved up from {folder.parent.name}/)")
+        print()
 
     if args.dry_run:
         print("[dry run] No changes made. Add --no-dry-run to execute.")

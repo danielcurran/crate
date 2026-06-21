@@ -55,6 +55,7 @@ python3 -m venv venv && source venv/bin/activate && pip install mutagen
 - Removes years from album names
 - Preserves original casing (billy woods stays billy woods)
 - Creates a rollback file for undo
+- **Flattens artist containers** — auto-detects folders that contain album subdirectories (e.g., `Brian Eno/` containing `1973 Here Come The Warm Jets`) and renames+promotes the children to `Artist - Album` at the container's parent level
 
 ## Edge cases needing your intervention
 
@@ -62,6 +63,7 @@ python3 -m venv venv && source venv/bin/activate && pip install mutagen
 - **Live recordings** with dates in the name (e.g., `tinariwen - 2004 11 08 - cultural center, chicago [flac]`) — flag for user review
 - **Multi-artist with hyphens** in artist name (e.g., `Matt Sweeney & Bonnie -Prince- Billy - Superwolves`) — verify parse is correct
 - **Various Artists compilations** — kept as-is by default
+- **Folders named like "new downloads", "incoming", "misc"** — recognized as non-album and left alone
 
 ## Safety
 
@@ -75,3 +77,9 @@ python3 -m venv venv && source venv/bin/activate && pip install mutagen
 - Do NOT rename folders unless the user explicitly confirms after reviewing the dry-run output
 - Output format is exactly `Artist - Album` (no year, no format tags)
 - Preserve the original casing of artist and album names
+
+## Flags
+
+- `--no-flatten` — disable automatic detection of artist container folders
+- `--yes` / `-y` — skip interactive prompts (for unattended runs)
+- `--skip-metadata` — don't scan audio file tags for missing artists
