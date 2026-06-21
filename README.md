@@ -61,10 +61,17 @@ python crate.py --undo
 
 ## OpenCode skill
 
-Crate ships with an agent skill so [OpenCode](https://opencode.ai) can run it for you:
+## OpenCode agent skill
 
-```
-~/.config/opencode/skills/crate/SKILL.md
+Crate ships with an agent skill so [OpenCode](https://opencode.ai) can run it for you.
+
+**Auto-discovered** — run opencode from this repo directory and the skill is available immediately (ships at `.opencode/skills/crate/SKILL.md`).
+
+**Global install** — to use from any directory:
+
+```bash
+mkdir -p ~/.config/opencode/skills/crate
+cp .opencode/skills/crate/SKILL.md ~/.config/opencode/skills/crate/SKILL.md
 ```
 
 ## Requirements
